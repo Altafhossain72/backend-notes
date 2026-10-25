@@ -2276,6 +2276,24 @@ addItems("sdcase", [
  k:"Keep it thin: route · authN · rate limit · observability · stateless + horizontal · JWT verified locally with cached JWKS · fail-open/closed decided per route",
  a:`<ul><li><b>Keep it thin.</b> Routing, TLS termination, authentication, rate limiting, request size limits, correlation ids, metrics. No business logic, no transformation of payloads beyond headers, no "validation" of domain rules. Everything else goes downstream or into a sidecar. A fat gateway is a single point of failure and a bottleneck for every request.</li><li><b>Scale.</b> Stateless instances behind a load balancer (or anycast); non-blocking I/O (Spring Cloud Gateway on Netty, Envoy, Kong, nginx). Per-instance capacity × instances; no shared state in the hot path except the rate limiter.</li><li><b>JWT validation.</b> Verify <i>at the gateway</i> (signature, exp, iss, aud) using JWKS keys <b>cached in memory</b> and refreshed in the background: no network call per request. Pass the verified identity downstream (forwarded claims or a signed internal header). Downstream services still enforce <b>authorization</b> (ownership, roles), because a gateway can't know every service's rules, and internal calls may bypass it.</li><li><b>Rate limiting across instances.</b> Token bucket or sliding window counters in Redis via a Lua script (atomic). Local token buckets per instance as a first layer to protect Redis. If Redis is down: <b>fail-open</b> for ordinary APIs (availability), <b>fail-closed</b> for login/OTP/payment initiation (abuse protection).</li><li><b>Failure modes to name.</b> Thundering herd when Redis or a downstream recovers (jittered backoff, request coalescing, circuit breakers per route); JWKS endpoint down (serve from cache, alert); a slow downstream eating gateway threads (timeouts and bulkheads per route); config push breaking routes (canary the gateway config).</li><li><b>Observability.</b> Per-route p99, error rate and rejected-by-limit counts; trace id injected here.</li></ul><p class="tie"><b>Your angle:</b> your gateway in front of the core APIs validates Keycloak tokens, and ownership checks still live in the services. That's the right split; say so.</p>`},
 ]);
+
+// Added 2026-10-26: collection choice as a two-question rule
+addItems("coll", [
+{q:"Which collection should I use? Give a rule you can apply in seconds.",
+ p:"Ask two questions: do I need order, and do I need fast lookup? The answers point to one collection. Checking contains() on a list means looking at every item; on a HashSet it's one slot.",
+ k:"Order? Lookup? · ArrayList default list · HashMap default map · HashSet for contains() · Linked* keeps insertion order · Tree* sorted · ArrayDeque for stack/queue · LinkedList almost never",
+ a:`<pre><code>Need                                   Use
+ordered list, index access, duplicates  ArrayList
+stack or queue                          ArrayDeque (not Stack, not LinkedList)
+unique values, fast contains()          HashSet            O(1)
+unique values in insertion order        LinkedHashSet
+unique values always sorted / ranges    TreeSet            O(log n)
+key → value, no order                   HashMap            O(1)
+key → value, insertion/access order     LinkedHashMap      (LRU with accessOrder=true)
+key → value, sorted keys / nearest key  TreeMap            O(log n)
+shared between threads                  ConcurrentHashMap, CopyOnWriteArrayList
+enum keys                               EnumMap / EnumSet</code></pre><ul><li><code>list.contains(x)</code> scans every element, O(n); <code>set.contains(x)</code> hashes to one bucket, O(1). A loop that calls <code>contains</code> on a list is the classic hidden O(n²).</li><li><code>LinkedList</code> is almost never the right choice: poor cache locality and O(n) index access. <code>ArrayDeque</code> beats it for queues and stacks; <code>ArrayList</code> for lists.</li><li>Interview phrasing: "Choosing a collection isn't style; it decides the complexity. I ask whether I need order and whether I need fast lookup, then pick from the table."</li></ul>`},
+]);
 // ================= Diagrams =================
 const DEFS = `<defs>
 <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker>
