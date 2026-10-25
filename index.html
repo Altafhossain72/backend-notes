@@ -2061,6 +2061,28 @@ h:"Pattern → key idea → complexity"
 // Keep the new topics in a sensible place
 const ORDER2 = ["java","coll","conc","jvm","jadv","j8","spring","tx","db","dbx","cache","api","ms","dist","kafka","sec","appsec","sdf","sdcase","sd","lld","test","obs","ops","aws","proj","senior","code","dsaq"];
 T.sort((a, b) => ORDER2.indexOf(a.id) - ORDER2.indexOf(b.id));
+
+// Added 2026-10-25: Spring Data keyset pagination (from the user's saved article)
+addItems("db", [
+{q:"Spring Data: deep pagination over tens of millions of rows is slow. How do you fix it? (keyset, Window, WindowIterator)",
+ p:"OFFSET makes the database walk past and throw away 500,000 rows every time someone scrolls deeper. Keyset pagination keeps a bookmark (the last row's sort key) and asks only for 'the next 20 after this bookmark'.",
+ k:"OFFSET = read and discard · keyset = WHERE (created_on, id) < bookmark · Window + ScrollPosition.keyset() · index on the sort columns",
+ a:`<ul><li>Symptom: <code>select * from post_comment order by created_on desc offset 500000 limit 20</code>. The DB reads 500,020 rows to return 20, so deeper pages get slower, CPU rises and response times vary.</li><li>Keyset SQL: <code>where (created_on, id) &lt; (:lastCreatedOn, :lastId) order by created_on desc, id desc limit 20</code> with an index on <code>(created_on desc, id desc)</code>. Every page costs the same.</li></ul>
+<pre><code>// Spring Data 3.1+
+interface CommentRepository extends Repository&lt;PostComment, Long&gt; {
+  Window&lt;PostComment&gt; findFirst20ByPostIdOrderByCreatedOnDescIdDesc(Long postId, ScrollPosition position);
+}
+Window&lt;PostComment&gt; page = repo.findFirst20ByPostIdOrderByCreatedOnDescIdDesc(postId, ScrollPosition.keyset());
+if (page.hasNext()) {
+  page = repo.findFirst20ByPostIdOrderByCreatedOnDescIdDesc(postId, page.positionAt(page.size() - 1));
+}
+// process everything in batches
+WindowIterator&lt;PostComment&gt; it = WindowIterator
+    .of(pos -&gt; repo.findFirst20ByPostIdOrderByCreatedOnDescIdDesc(postId, pos))
+    .startingAt(ScrollPosition.keyset());
+it.forEachRemaining(this::process);</code></pre>
+<ul><li>The sort must be unique and deterministic, so add <code>id</code> as a tie-breaker, and back it with a matching index.</li><li>Give the client an opaque cursor (the encoded last created_on + id), not a page number. The trade-off: no "jump to page N".</li><li>Also select only the columns you need instead of <code>*</code>.</li></ul>`},
+]);
 // ================= Diagrams =================
 const DEFS = `<defs>
 <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker>
