@@ -2083,6 +2083,199 @@ WindowIterator&lt;PostComment&gt; it = WindowIterator
 it.forEachRemaining(this::process);</code></pre>
 <ul><li>The sort must be unique and deterministic, so add <code>id</code> as a tie-breaker, and back it with a matching index.</li><li>Give the client an opaque cursor (the encoded last created_on + id), not a page number. The trade-off: no "jump to page N".</li><li>Also select only the columns you need instead of <code>*</code>.</li></ul>`},
 ]);
+// ---------- Added 2026-10-26: common Java/Spring screening questions + API gateway design ----------
+addItems("java", [
+{q:"How is Java platform independent? JDK vs JRE vs JVM",
+ p:"You write one recipe (bytecode). Every kitchen (operating system) has its own chef (JVM) who knows how to cook that recipe on local equipment.",
+ k:"Compile once to bytecode · JVM per platform · JDK = JRE + tools · JRE = JVM + libraries",
+ a:`<ul><li><code>javac</code> compiles source to <b>bytecode</b> (<code>.class</code>), which is the same on every OS. A platform-specific <b>JVM</b> interprets and JIT-compiles it for the local CPU and OS. "Write once, run anywhere" is a property of the bytecode plus a JVM for each platform.</li><li><b>JVM</b>: runs bytecode (class loading, memory, GC, JIT). <b>JRE</b>: JVM + standard libraries, enough to run programs. <b>JDK</b>: JRE + compiler and tools (<code>javac</code>, <code>jar</code>, <code>jstack</code>, <code>jcmd</code>). Since Java 11 the JRE isn't shipped separately; use <code>jlink</code> to build a trimmed runtime.</li></ul>`},
+{q:"What is a ClassLoader? ClassNotFoundException vs NoClassDefFoundError",
+ p:"A librarian who fetches a book the first time you ask for it. ClassNotFoundException: you asked for a book by name and the library has no such book. NoClassDefFoundError: the book was in the catalogue when the program was compiled, but it's missing or broken now.",
+ k:"Bootstrap → Platform → Application; parent-first · CNFE = checked, by-name lookup · NCDFE = Error, class was there at compile time",
+ a:`<ul><li>Class loaders load bytecode on first use: <b>Bootstrap</b> (core <code>java.base</code>), <b>Platform</b> (JDK modules), <b>Application</b> (your classpath). They delegate <b>parent-first</b>, so you can't shadow <code>java.lang.String</code>. App servers and Spring Boot's fat jar use custom loaders; a class loaded by two loaders is two different classes (a classic <code>ClassCastException</code> source).</li><li><b>ClassNotFoundException</b> (checked): a reflective lookup by name failed, e.g. <code>Class.forName("com.x.Driver")</code> with the driver jar missing.</li><li><b>NoClassDefFoundError</b> (Error): the class existed at compile time but can't be loaded at runtime: jar missing from the deployment, version mismatch, or its static initializer threw earlier (look for an <code>ExceptionInInitializerError</code> above it in the log).</li></ul>`},
+{q:"What does Serializable do? What are serialVersionUID and transient?",
+ p:"A marker on a box saying it may be flattened into bytes and rebuilt later. The version number on the box says which blueprint it was packed with; 'transient' fields are left out of the box.",
+ k:"Marker interface · serialVersionUID guards compatibility · transient skipped · prefer JSON/explicit formats",
+ a:`<ul><li><code>Serializable</code> has no methods; it just permits Java's built-in object serialization. All non-transient, non-static fields are written; referenced objects must be serializable too.</li><li><code>serialVersionUID</code>: a version stamp. If it differs between writer and reader you get <code>InvalidClassException</code>. Declare it explicitly, or the compiler derives one that changes with any class edit.</li><li><code>transient</code>: excluded from serialization (passwords, caches, connections); comes back as null/0.</li><li>In practice, prefer JSON (Jackson) or protobuf. Java serialization is slow, brittle and a well-known security risk when deserializing untrusted input. Records, Java 17+, can be serialized but are reconstructed through the canonical constructor.</li></ul>`},
+{q:"Can a class be static, final, private or abstract?",
+ p:"A building (top-level class) can't be 'static' or 'private'; those words only make sense for rooms inside another building (nested classes).",
+ k:"Top-level: public/package-private, final or abstract · Nested: also static and private · final ≠ abstract",
+ a:`<ul><li><b>Top-level</b> class: <code>public</code> or package-private; may be <code>final</code> (no subclasses, e.g. <code>String</code>) or <code>abstract</code> (can't be instantiated), never both. Not <code>static</code> or <code>private</code>.</li><li><b>Nested</b> class: can also be <code>static</code> (doesn't need an outer instance; the normal choice for helpers and builders) or <code>private</code>. A non-static inner class holds a hidden reference to the outer instance, a common memory-leak source.</li><li>Records are implicitly final; enums are implicitly final unless constants have bodies.</li></ul>`},
+{q:"What is autoboxing, and where does it bite?",
+ p:"Java quietly puts a plain number into a gift box (Integer) and takes it out again. The box can be empty (null) and two boxes aren't the same box even if they hold the same number.",
+ k:"Integer cache −128..127 → == trap · null unboxing NPE · boxing in loops is slow · use primitives in hot code",
+ a:`<pre><code>Integer a = 127, b = 127;  a == b  → true  (cached)
+Integer c = 128, d = 128;  c == d  → false (new objects) → use equals()
+Integer n = null; int x = n;       → NullPointerException
+Long sum = 0L; for (...) sum += i; → boxes and unboxes every iteration</code></pre><ul><li>Autoboxing converts primitives to wrappers and back automatically. Compare wrappers with <code>equals</code>, never <code>==</code>. Avoid wrappers as map values or loop counters in hot code; use <code>int</code>/<code>long</code> and primitive streams (<code>IntStream</code>).</li></ul>`},
+{q:"Why can't an interface have a constructor? Can it have default and static methods?",
+ p:"An interface is a job description, not an employee. You can't 'build' a job description, but it may include standard procedures (default methods) and utility notes (static methods).",
+ k:"No state, nothing to construct · default (Java 8) · static (8) · private helpers (9) · constants only",
+ a:`<ul><li>A constructor initialises instance state; an interface has no instance fields (only <code>public static final</code> constants) and is never instantiated by itself, so a constructor would have nothing to do. The implementing class's constructor runs instead.</li><li>Since Java 8: <b>default</b> methods (with a body, inherited, lets you evolve an interface without breaking implementors) and <b>static</b> methods. Since 9: <b>private</b> methods to share code between defaults.</li><li>Functional interfaces may contain any number of default/static methods; only <i>one</i> abstract method.</li></ul>`},
+{q:"Performance: for-loop vs for-each (enhanced for)",
+ p:"Same journey, different vehicle: for-each uses an iterator under the hood; the classic loop uses an index. On an array or ArrayList the difference is negligible; on a LinkedList the index loop is a disaster.",
+ k:"Readability first · ArrayList/array: same · LinkedList get(i) is O(n²) · need index or removal → classic loop or iterator",
+ a:`<ul><li><b>for-each</b> over an array compiles to an index loop; over a collection it uses <code>Iterator</code>. The JIT makes both fast on <code>ArrayList</code>.</li><li><b>Classic for</b> with <code>get(i)</code> is O(n) per access on <code>LinkedList</code>, so the loop becomes O(n²). Use for-each or an iterator there.</li><li>Use the classic loop when you need the index, to iterate backwards, or to modify by index; use <code>Iterator.remove()</code> to delete while iterating (for-each throws <code>ConcurrentModificationException</code>).</li><li>Streams add small overhead; fine for clarity, avoid in the hottest loops.</li></ul>`},
+{q:"What is try-with-resources, and how does it beat try/finally?",
+ p:"A tap that turns itself off when you leave the room, even if you leave in a hurry (exception).",
+ k:"AutoCloseable · closes in reverse order · suppressed exceptions kept · no null checks or nested finally",
+ a:`<pre><code>try (Connection c = ds.getConnection();
+     PreparedStatement ps = c.prepareStatement(sql)) {
+  ...
+} // ps then c closed automatically, even on exception</code></pre><ul><li>Works with any <code>AutoCloseable</code>. Resources close in reverse order of declaration.</li><li>If both the body and <code>close()</code> throw, the body's exception wins and the close exception is attached via <code>getSuppressed()</code>, which plain try/finally would lose.</li><li>Java 9+: you can use an existing effectively-final variable in the header. This is the fix for connection and file-handle leaks.</li></ul>`},
+{q:"Write code where 5 threads print in sequence (1, 2, 3, 4, 5, repeated)",
+ p:"Five people in a circle, each holding a number; a shared token says whose turn it is, and everyone else waits until the token points at them.",
+ k:"Shared turn counter + lock/condition · wait in a while loop · notifyAll · or a Semaphore chain",
+ a:`<pre><code>class SequencePrinter {
+  private final int n; private int turn = 0; // whose turn (0..n-1)
+  SequencePrinter(int n) { this.n = n; }
+  synchronized void print(int id, int rounds) throws InterruptedException {
+    for (int r = 0; r &lt; rounds; r++) {
+      while (turn != id) wait();            // wait in a loop: spurious wakeups
+      System.out.println(Thread.currentThread().getName() + " -&gt; " + (id + 1));
+      turn = (turn + 1) % n;
+      notifyAll();
+    }
+  }
+}
+// main: for id in 0..4: new Thread(() -&gt; sp.print(id, 3), "T" + (id+1)).start();</code></pre><ul><li>Alternatives: a <code>Semaphore</code> per thread where each thread releases the next one's semaphore, or <code>ReentrantLock</code> with one <code>Condition</code> per thread (no spurious wake-ups of everyone).</li><li>Interviewers listen for: guarded wait in a <code>while</code>, releasing the monitor while waiting, and <code>notifyAll</code> rather than <code>notify</code>.</li></ul>`},
+]);
+
+addItems("coll", [
+{q:"List vs Set vs Map: when do you use which?",
+ p:"A list is a queue of people in order (duplicates fine). A set is a guest list (names once). A map is a phone book (look up by name).",
+ k:"List = order + duplicates · Set = uniqueness · Map = key → value · pick the implementation by access pattern",
+ a:`<ul><li><b>List</b>: ordered, indexed, duplicates allowed. <code>ArrayList</code> by default; <code>ArrayDeque</code> for stack/queue use.</li><li><b>Set</b>: no duplicates. <code>HashSet</code> (fast, unordered), <code>LinkedHashSet</code> (insertion order), <code>TreeSet</code> (sorted, range queries, O(log n)).</li><li><b>Map</b>: key to value. <code>HashMap</code>, <code>LinkedHashMap</code> (order / LRU), <code>TreeMap</code> (sorted), <code>ConcurrentHashMap</code> (threads), <code>EnumMap</code> for enum keys.</li><li>Decide by the question you ask most often: "the i-th item" (List), "is X present" (Set), "value for key" (Map), "sorted / nearest" (Tree*).</li></ul>`},
+{q:"HashMap vs Hashtable vs ConcurrentHashMap",
+ p:"HashMap: one unlocked cupboard. Hashtable: one cupboard with a single big padlock (everyone queues). ConcurrentHashMap: a lock on each drawer.",
+ k:"Hashtable = legacy, whole-map lock, no nulls · HashMap = fast, not thread-safe, one null key · CHM = per-bin locking, no nulls",
+ a:`<ul><li><b>Hashtable</b>: legacy (Java 1.0), every method <code>synchronized</code>, no null keys or values. Don't use it; <code>Collections.synchronizedMap</code> has the same drawback.</li><li><b>HashMap</b>: not thread-safe, allows one null key and null values, fail-fast iterator.</li><li><b>ConcurrentHashMap</b>: lock-free reads, CAS/per-bin locking for writes, atomic <code>compute</code>/<code>merge</code>/<code>putIfAbsent</code>, weakly consistent iterators, no nulls. The choice for shared maps.</li></ul>`},
+{q:"How is hashCode generated, and what is the equals/hashCode contract?",
+ p:"hashCode is the mailbox number for an object. Objects that are 'equal' must get the same mailbox number, or you'll never find the letter again.",
+ k:"Default = identity-based (not the address) · override with fields used in equals · equal ⇒ same hashCode · Objects.hash / records",
+ a:`<ul><li><code>Object.hashCode()</code> is an identity hash, usually a random number generated on first use and stored in the object header (not the memory address, objects move during GC).</li><li>Override it together with <code>equals</code> using the same fields: <code>Objects.hash(a, b)</code>, or the classic <code>31 * h + field</code>. Records and <code>String</code> compute it from content (<code>String</code> caches it).</li><li>Contract: equal objects must have equal hashCodes; unequal objects may collide. A good hashCode spreads keys so HashMap buckets stay short.</li></ul>`},
+{q:"What is the Iterable interface, and why can you use for-each on your own class?",
+ p:"Iterable means 'I can hand out a cursor that walks my items one by one'. The for-each loop just asks for that cursor.",
+ k:"Iterable.iterator() → Iterator (hasNext/next) · for-each works on any Iterable · forEach default method",
+ a:`<pre><code>class Pages implements Iterable&lt;Page&gt; {
+  public Iterator&lt;Page&gt; iterator() { return list.iterator(); }
+}
+for (Page p : pages) { ... }     // compiles to: Iterator it = pages.iterator(); while (it.hasNext()) ...</code></pre><ul><li><code>Iterable</code> is the root of the collection hierarchy (<code>Collection extends Iterable</code>). <code>Iterator</code> has <code>hasNext()</code>, <code>next()</code> and optional <code>remove()</code>. <code>Iterable.forEach(Consumer)</code> is a default method. <code>Spliterator</code> (Java 8) backs streams and parallel splitting.</li></ul>`},
+]);
+
+addItems("j8", [
+{q:"What is the Streams API, and how is a Stream different from a Collection?",
+ p:"A collection is a bucket of things. A stream is a conveyor belt: items flow past processing stations once, and nothing moves until you attach the final station.",
+ k:"Collection stores · Stream describes a pipeline · lazy · single use · no side effects",
+ a:`<ul><li>A <b>Collection</b> holds data in memory and you can iterate it many times. A <b>Stream</b> is a one-time pipeline over a source: nothing runs until a terminal operation, and a consumed stream can't be reused (<code>IllegalStateException</code>).</li><li>Streams don't modify the source; they produce new results. They can be infinite (<code>Stream.iterate</code>) and limited with <code>limit</code>.</li><li>Use streams for readable transformation pipelines, collections for storage and random access.</li></ul>`},
+{q:"Ways to create a Stream; intermediate vs terminal operations",
+ p:"Streams start from a bucket, a list of values, a number range or a generator. Stations in the middle shape items; the last station produces the answer and starts the belt.",
+ k:"collection.stream(), Stream.of, Arrays.stream, IntStream.range, Files.lines, iterate/generate · intermediate = lazy · terminal = runs it",
+ a:`<pre><code>list.stream();  Stream.of(1, 2, 3);  Arrays.stream(arr);
+IntStream.rangeClosed(1, 10);  Files.lines(path);  Stream.iterate(1, x -&gt; x * 2).limit(10);
+Pattern.compile(",").splitAsStream(csv);  map.entrySet().stream();</code></pre><ul><li><b>Intermediate</b> (lazy, return a Stream): <code>filter</code>, <code>map</code>, <code>flatMap</code>, <code>sorted</code>, <code>distinct</code>, <code>limit</code>, <code>skip</code>, <code>peek</code>. Nothing happens until a terminal op.</li><li><b>Terminal</b> (run the pipeline): <code>collect</code>, <code>forEach</code>, <code>reduce</code>, <code>count</code>, <code>findFirst</code>, <code>anyMatch</code>, <code>toList()</code> (Java 16). <code>sorted</code> and <code>distinct</code> are stateful and need all elements before emitting.</li></ul>`},
+{q:"collect(), findFirst() vs findAny(), and converting a Stream to a collection",
+ p:"collect gathers the belt's output into a container. findFirst takes the first item in line; findAny grabs whichever item is nearest, which matters only when several workers (parallel) are picking.",
+ k:"collect(Collectors.toList/toSet/toMap/groupingBy) · toList() Java 16 unmodifiable · findFirst ordered · findAny faster in parallel",
+ a:`<pre><code>List&lt;String&gt; names = people.stream().map(Person::name).toList();            // Java 16+, unmodifiable
+Set&lt;String&gt; set   = names.stream().collect(Collectors.toSet());
+Map&lt;String, Person&gt; byId = people.stream().collect(Collectors.toMap(Person::id, p -&gt; p, (a, b) -&gt; a));
+Optional&lt;Person&gt; first = people.stream().filter(p -&gt; p.age() &gt; 30).findFirst();</code></pre><ul><li><code>findFirst</code> respects encounter order; <code>findAny</code> may return any element and lets parallel streams stop early. Both return <code>Optional</code> and short-circuit.</li><li><code>toMap</code> throws on duplicate keys unless you pass a merge function. <code>Collectors.toList()</code> gives a mutable list in practice; <code>Stream.toList()</code> is unmodifiable.</li></ul>`},
+{q:"How do you handle checked exceptions inside a Stream lambda?",
+ p:"The belt's stations only accept instructions that don't throw paperwork errors. Either handle the error inside the station or wrap it in a sticker the belt accepts.",
+ k:"Functional interfaces don't declare checked exceptions · handle inside · wrap in unchecked · or a wrapper helper · consider a plain loop",
+ a:`<pre><code>// 1. handle inside the lambda
+paths.stream().map(p -&gt; { try { return Files.readString(p); }
+                           catch (IOException e) { throw new UncheckedIOException(e); } })
+// 2. a small wrapper
+@FunctionalInterface interface ThrowingFn&lt;T,R&gt; { R apply(T t) throws Exception; }
+static &lt;T,R&gt; Function&lt;T,R&gt; unchecked(ThrowingFn&lt;T,R&gt; f) {
+  return t -&gt; { try { return f.apply(t); } catch (Exception e) { throw new RuntimeException(e); } };
+}
+paths.stream().map(unchecked(Files::readString))</code></pre><ul><li>For I/O-heavy work with real error handling, a plain loop is often clearer than fighting the stream. Never swallow the exception silently.</li></ul>`},
+{q:"Sequential vs parallel streams: when is parallel worth it?",
+ p:"One worker on one belt vs splitting the pile across several workers. Splitting pays off only when the pile is large and each item is heavy to process.",
+ k:"CPU-bound + large + cheap to split · shared commonPool · no shared mutable state · measure first",
+ a:`<ul><li><code>parallelStream()</code> splits the source with a <code>Spliterator</code> and runs on <code>ForkJoinPool.commonPool()</code> (cores − 1 threads), shared by the whole JVM.</li><li>Worth it: large arrays/ArrayLists, CPU-bound per-element work, no I/O, no shared mutable state, order not critical. Not worth it: small data, blocking calls, LinkedList (splits badly), inside a web request (starves other requests), stateful lambdas.</li><li>Rule: default to sequential; go parallel only after measuring.</li></ul>`},
+]);
+
+addItems("spring", [
+{q:"@Component vs @Bean; what do @Qualifier and @Value do?",
+ p:"@Component: 'Spring, please build this class of mine'. @Bean: 'here's a recipe method that builds something, often someone else's class'. @Qualifier picks between twins. @Value reads a setting.",
+ k:"@Component on your class (scanned) · @Bean on a method in @Configuration (third-party or custom setup) · @Qualifier by name · @Value from properties",
+ a:`<ul><li><b>@Component</b> (and @Service, @Repository, @Controller) marks your own class for component scanning; Spring instantiates it.</li><li><b>@Bean</b> goes on a method inside a <code>@Configuration</code> class and returns an object Spring should manage. Use it for third-party types (<code>ObjectMapper</code>, <code>RestClient</code>, a <code>DataSource</code>) or when construction needs logic.</li><li><b>@Qualifier("name")</b> chooses between several beans of the same type.</li><li><b>@Value("\${app.timeout:5000}")</b> injects a property with a default; for groups of settings prefer <code>@ConfigurationProperties</code>.</li></ul>`},
+{q:"@Mock vs @InjectMocks vs @MockBean",
+ p:"@Mock makes a cardboard stand-in. @InjectMocks builds the real object you're testing and hands it the stand-ins. @MockBean does the same inside a Spring test context.",
+ k:"@Mock = Mockito fake · @InjectMocks = real class under test with mocks injected · @MockBean = replace a bean in the Spring context (slower)",
+ a:`<pre><code>@ExtendWith(MockitoExtension.class)
+class TransferServiceTest {
+  @Mock AccountRepository repo;
+  @Mock NotificationClient notifier;
+  @InjectMocks TransferService service;   // constructor injection with the mocks above
+  @Test void rejectsWhenInsufficientFunds() {
+    when(repo.findById(1L)).thenReturn(Optional.of(new Account(1L, 100)));
+    assertThrows(InsufficientFundsException.class, () -&gt; service.transfer(1L, 2L, 500));
+    verify(notifier, never()).send(any());
+  }
+}</code></pre><ul><li><code>@InjectMocks</code> tries constructor, then setter, then field injection. Prefer constructor injection so it's explicit.</li><li><code>@MockBean</code> (Spring Boot) swaps a bean in the application context for slice tests like <code>@WebMvcTest</code>; it restarts the context cache, so use sparingly. In Boot 3.4+ it's <code>@MockitoBean</code>.</li></ul>`},
+{q:"Spring Data JPA: the main repository interfaces and derived queries",
+ p:"Spring writes the boring database code for you from an interface: you name the method, Spring builds the query.",
+ k:"Repository → CrudRepository → PagingAndSortingRepository → JpaRepository · findByXAndY · @Query for the rest",
+ a:`<ul><li><b>Repository</b> (marker) → <b>CrudRepository</b> (save, findById, findAll, delete) → <b>PagingAndSortingRepository</b> (findAll(Pageable)) → <b>JpaRepository</b> (flush, saveAll, batch deletes, getReferenceById). Spring Data 3: <code>ListCrudRepository</code> returns Lists.</li><li>Derived queries from method names: <code>findByStatusAndCreatedAtAfter(...)</code>, <code>existsByEmail</code>, <code>countBy...</code>, <code>Top5By...OrderBy...</code>. Beyond simple cases use <code>@Query</code> (JPQL or native), <code>Specification</code>, or Querydsl/jOOQ.</li><li>Return types: entity, <code>Optional</code>, <code>List</code>, <code>Page</code>, <code>Slice</code>, <code>Stream</code>, DTO projections (interface or record).</li></ul>`},
+{q:"How does Spring/Hibernate generate SQL from your code?",
+ p:"You speak in objects; Hibernate translates to the database's dialect of SQL, like a interpreter who knows each database's accent.",
+ k:"Entity mapping → JPQL/derived query → SQL via Dialect · flush at commit · show-sql / p6spy to see it",
+ a:`<ul><li><code>@Entity</code> mappings tell Hibernate tables and columns. Derived queries and JPQL are parsed into an internal tree and rendered as SQL for the configured <b>Dialect</b> (PostgreSQL, MySQL...), which handles paging syntax, sequences and functions.</li><li>Writes are collected in the persistence context and sent at <b>flush</b> (before a query or at commit), ordered inserts/updates/deletes, optionally batched.</li><li>See the SQL with <code>spring.jpa.show-sql</code> (dev only) or better <code>logging.level.org.hibernate.SQL=DEBUG</code> plus <code>BasicBinder=TRACE</code> for parameters, or datasource-proxy/p6spy. That's how you catch N+1 and bad queries.</li></ul>`},
+{q:"Controller vs Service vs Repository: what belongs where?",
+ p:"Reception desk (controller) takes the request and hands back the answer; the office (service) does the work and makes decisions; the filing room (repository) only stores and fetches.",
+ k:"Controller = HTTP in/out, validation, mapping · Service = business rules + transactions · Repository = persistence only",
+ a:`<ul><li><b>Controller</b>: parse and validate input, call one service method, map the result to a response and status code. No business logic, no repository calls.</li><li><b>Service</b>: business rules, orchestration, <code>@Transactional</code> boundaries, calls to other services and repositories, domain exceptions.</li><li><b>Repository</b>: data access only. No business decisions.</li><li>Pass DTOs across the controller boundary, not entities. Keep each layer unit-testable alone.</li></ul>`},
+{q:"Pagination with Spring Data, and handling unique constraints",
+ p:"Ask the filing room for 'page 3, 20 items, newest first' instead of everything. And let the database be the final guard against duplicates, then translate its complaint into a polite error.",
+ k:"Pageable + Page/Slice · stable sort + tie-breaker · unique index in DB · catch DataIntegrityViolationException → 409",
+ a:`<pre><code>Page&lt;Txn&gt; page = repo.findByAccountId(id, PageRequest.of(2, 20, Sort.by("createdAt").descending().and(Sort.by("id").descending())));
+// controller: accept page/size/sort, cap size, return content + totalElements (or Slice to skip the count)</code></pre><ul><li><code>Page</code> runs a count query; <code>Slice</code> doesn't (cheaper). Deep offsets are slow; use keyset pagination for feeds (see Databases).</li><li>Unique constraints: declare them in the DB (<code>@Table(uniqueConstraints=...)</code> or Flyway). Don't rely on "check then insert", it races. Catch <code>DataIntegrityViolationException</code> and return 409 Conflict with a clear message; for idempotent creates, look up the existing row instead.</li></ul>`},
+{q:"What is application.properties / application.yml for, and how do profiles work?",
+ p:"The settings sheet for the app: ports, database, timeouts. One sheet per environment, and the active profile picks which overrides apply.",
+ k:"Externalised config · application-{profile} overrides base · env vars and CLI args override files · bind with @ConfigurationProperties",
+ a:`<ul><li>Holds configuration outside code: server port, datasource, JPA, logging, your own <code>app.*</code> keys. YAML or properties, same result.</li><li><code>application-prod.yml</code> overrides <code>application.yml</code> when <code>spring.profiles.active=prod</code>. Environment variables and command-line args override both, so the same jar runs everywhere (see "Configuration precedence").</li><li>Bind groups of keys to a typed, validated class with <code>@ConfigurationProperties(prefix = "app.payment")</code>. Never commit secrets; inject them from the environment or a vault.</li></ul>`},
+]);
+
+addItems("lld", [
+{q:"Builder pattern: when do you use it, with an example?",
+ p:"Ordering a custom sandwich step by step instead of a constructor with twelve ingredients in a fixed order.",
+ k:"Many optional fields · readable construction · immutable result · validate in build() · Lombok @Builder / records with builders",
+ a:`<pre><code>TransferRequest req = TransferRequest.builder()
+    .fromAccount("0011")
+    .toAccount("0022")
+    .amount(new BigDecimal("500.00"))
+    .currency("BDT")
+    .narration("Rent")          // optional
+    .build();                   // validates and returns an immutable object</code></pre><ul><li>Use when a type has several optional fields or construction has rules. Avoids telescoping constructors and argument-order bugs, and keeps the built object immutable.</li><li>Hand-written: a static nested <code>Builder</code> with fluent setters and a <code>build()</code> that validates. Lombok <code>@Builder</code> generates it. Used widely in the JDK and libraries (<code>HttpRequest.newBuilder()</code>, <code>StringBuilder</code> is the same idea).</li></ul>`},
+{q:"Factory pattern: the concept and when it helps",
+ p:"A counter that hands you the right product for your order; you never need to know which workshop built it.",
+ k:"Creation behind a method · caller depends on the interface · switch on type lives in one place · Spring beans are factories",
+ a:`<pre><code>interface PaymentRail { TransferResult transfer(TransferRequest r); }
+class RailFactory {
+  private final Map&lt;RailType, PaymentRail&gt; rails;         // injected by Spring
+  PaymentRail forType(RailType t) {
+    PaymentRail r = rails.get(t);
+    if (r == null) throw new UnsupportedRailException(t);
+    return r;
+  }
+}</code></pre><ul><li>Callers code against <code>PaymentRail</code>; the factory decides the concrete class. Adding a rail changes the factory (or a Spring-injected map), not every caller.</li><li>Variants: static factory methods (<code>List.of</code>, <code>Integer.valueOf</code>), factory method (subclasses decide), abstract factory (families of related objects). Spring's <code>BeanFactory</code> and <code>FactoryBean</code> are the pattern at framework scale.</li></ul>`},
+{q:"Why are design patterns needed? Which do you know, and how would you 'invent' one?",
+ p:"Patterns are shared names for solutions that keep recurring, so a team can say 'use a strategy here' instead of a paragraph. Inventing one means noticing you've solved the same problem three times and giving the shape a name.",
+ k:"Shared vocabulary · proven shapes · don't force them · a pattern = recurring problem + context + trade-offs",
+ a:`<ul><li>Patterns give a shared vocabulary and proven structures for change points: swapping algorithms (Strategy), creating objects (Factory, Builder), reacting to events (Observer), adding behaviour (Decorator), adapting interfaces (Adapter), state-dependent behaviour (State), request pipelines (Chain of Responsibility).</li><li>Misuse: applying patterns where a plain method would do. Start simple; introduce a pattern when the second or third variant appears.</li><li>"Inventing" one: you notice a recurring problem in your codebase (e.g. "every rail does pre-check → debit → call partner → recheck → finalize"), extract the stable skeleton (a template with pluggable steps), name it, document when it applies and its trade-offs. That's exactly how published patterns were born, and a transaction-rail template is a good example from payments.</li></ul>`},
+]);
+
+addItems("sdcase", [
+{q:"Design an API gateway for 100K+ requests/second. Where should auth, rate limiting and JWT validation live?",
+ p:"The gateway is the building's front desk. It checks badges and stops crowds, then points you to the right office. It must never start doing the offices' work, or the whole building queues at the desk.",
+ k:"Keep it thin: route · authN · rate limit · observability · stateless + horizontal · JWT verified locally with cached JWKS · fail-open/closed decided per route",
+ a:`<ul><li><b>Keep it thin.</b> Routing, TLS termination, authentication, rate limiting, request size limits, correlation ids, metrics. No business logic, no transformation of payloads beyond headers, no "validation" of domain rules. Everything else goes downstream or into a sidecar. A fat gateway is a single point of failure and a bottleneck for every request.</li><li><b>Scale.</b> Stateless instances behind a load balancer (or anycast); non-blocking I/O (Spring Cloud Gateway on Netty, Envoy, Kong, nginx). Per-instance capacity × instances; no shared state in the hot path except the rate limiter.</li><li><b>JWT validation.</b> Verify <i>at the gateway</i> (signature, exp, iss, aud) using JWKS keys <b>cached in memory</b> and refreshed in the background: no network call per request. Pass the verified identity downstream (forwarded claims or a signed internal header). Downstream services still enforce <b>authorization</b> (ownership, roles), because a gateway can't know every service's rules, and internal calls may bypass it.</li><li><b>Rate limiting across instances.</b> Token bucket or sliding window counters in Redis via a Lua script (atomic). Local token buckets per instance as a first layer to protect Redis. If Redis is down: <b>fail-open</b> for ordinary APIs (availability), <b>fail-closed</b> for login/OTP/payment initiation (abuse protection).</li><li><b>Failure modes to name.</b> Thundering herd when Redis or a downstream recovers (jittered backoff, request coalescing, circuit breakers per route); JWKS endpoint down (serve from cache, alert); a slow downstream eating gateway threads (timeouts and bulkheads per route); config push breaking routes (canary the gateway config).</li><li><b>Observability.</b> Per-route p99, error rate and rejected-by-limit counts; trace id injected here.</li></ul><p class="tie"><b>Your angle:</b> your gateway in front of the core APIs validates Keycloak tokens, and ownership checks still live in the services. That's the right split; say so.</p>`},
+]);
 // ================= Diagrams =================
 const DEFS = `<defs>
 <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker>
