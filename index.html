@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex, nofollow">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4EEE1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Drill">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Backend Interview Drill</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -82,6 +88,7 @@ body{transition:background-color .2s, color .2s}
 .tabs{position:sticky; top:0; z-index:6; background:var(--paper); display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--rule); padding-top:4px}
 .tabs button{border:0; background:none; color:var(--muted); padding:10px 14px; border-bottom:2px solid transparent; white-space:nowrap; font-weight:500}
 .tabs button[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
+.tabs .short{display:none}
 .tabs .badge{display:inline-block; min-width:20px; margin-left:6px; padding:0 6px; border-radius:10px; background:var(--hot-soft); color:var(--hot); font-family:var(--f-mono); font-size:11px; text-align:center}
 .panel{padding-top:24px; display:grid; gap:36px}
 section{display:grid; gap:14px; scroll-margin-top:110px}
@@ -170,6 +177,7 @@ svg .arrow.hot{fill:var(--hot)}
 /* Flashcards */
 .fc-head{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center}
 .fc-head select{font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:7px 10px}
+#fc-opts{display:none}
 .fc-prog{font-family:var(--f-mono); font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
 .card{background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:22px 24px; display:grid; gap:16px; max-width:820px; min-height:240px; align-content:start}
 .card .front{font-family:var(--f-display); font-size:22px; line-height:1.3; text-wrap:balance}
@@ -227,12 +235,6 @@ details.full summary{cursor:pointer; font-size:13px; color:var(--muted)}
 
 footer{color:var(--muted); font-size:13px; border-top:1px solid var(--rule); padding-top:16px; margin-top:40px}
 
-@media (max-width: 600px){
-  .tabs{flex-wrap:wrap; overflow-x:visible}
-  .tabs button{padding:8px 10px}
-  .concepts td:first-child{white-space:normal; width:35%}
-  .bar{position:static}
-}
 @media (max-width: 900px){
   nav.index{display:none!important}
   .jump{display:grid}
@@ -243,6 +245,50 @@ footer{color:var(--muted); font-size:13px; border-top:1px solid var(--rule); pad
   .bar{top:44px}
   .rate{grid-template-columns:repeat(2, minmax(0,1fr))}
   .card .front{font-size:19px}
+}
+/* Phone: one-line header, tabs as a fixed bottom bar (thumb reach), rating buttons pinned above it */
+@media (max-width: 700px){
+  .wrap{padding-block:calc(10px + env(safe-area-inset-top, 0px)) calc(var(--tabbar, 56px) + 28px)}
+  header.top{align-items:center; gap:6px 12px; padding-bottom:6px}
+  header.top .eyebrow, header.top .sub{display:none}
+  h1{font-size:22px}
+  header.top .right{justify-items:end}
+  .theme button{font-size:12px; padding:5px 8px}
+  .tabs{position:fixed; top:auto; bottom:0; left:0; right:0; z-index:20; display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:0; overflow:visible;
+    border-top:1px solid var(--rule); border-bottom:0; box-shadow:0 -4px 12px rgba(0,0,0,.06);
+    padding:0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px))}
+  .tabs button{font-size:11.5px; padding:9px 2px 8px; white-space:normal; line-height:1.2; border-bottom:0; border-top:2px solid transparent; border-radius:0; min-height:46px}
+  .tabs button[aria-selected="true"]{border-top-color:var(--accent); background:var(--accent-soft)}
+  .tabs .long{display:none} .tabs .short{display:inline}
+  .tabs .badge{margin-left:3px; min-width:16px; padding:0 4px; font-size:10px}
+  section{scroll-margin-top:64px}
+  .panel{padding-top:12px; gap:28px}
+  h2{font-size:21px}
+  .today{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .today .stat.lead{grid-column:1 / -1}
+  .stat{padding:12px 14px}
+  .stat .big{font-size:28px}
+  .bar{position:static; padding-block:4px 10px}
+  .concepts td:first-child{white-space:normal; width:35%}
+  .jump{position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:var(--paper); padding-block:6px; margin-top:-6px}
+  .jump .eyebrow{display:none}
+  .topics{gap:40px}
+  .primer{padding:14px}
+  #fc-opts{display:inline-block}
+  .fc-head .opt{display:none}
+  .fc-head.open .opt{display:flex}
+  .keys-hint{display:none}
+  .card{padding:16px; min-height:0; border-radius:8px}
+  .card .kbd{display:none}
+  #fc-area{scroll-margin-top:8px}
+  #fc-area.revealed{padding-bottom:84px}
+  .rate{position:fixed; left:0; right:0; bottom:var(--tabbar, 56px); z-index:19; margin:0!important; max-width:none;
+    grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; background:var(--paper); border-top:1px solid var(--rule);
+    padding:8px max(10px, env(safe-area-inset-right, 0px)) 8px max(10px, env(safe-area-inset-left, 0px))}
+  .rate button{padding:7px 2px; font-size:14px; min-height:50px; border-radius:7px}
+  .rate button small{font-size:10px}
+  .sheet{columns:1}
+  footer{display:none}
 }
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} body{transition:none} }
 @media print{
@@ -273,9 +319,9 @@ footer{color:var(--muted); font-size:13px; border-top:1px solid var(--rule); pad
   <div class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tab-today" aria-controls="p-today" aria-selected="true">Today</button>
     <button type="button" role="tab" id="tab-learn" aria-controls="p-learn" aria-selected="false">Learn</button>
-    <button type="button" role="tab" id="tab-cards" aria-controls="p-cards" aria-selected="false">Flashcards<span class="badge" id="due-badge">0</span></button>
-    <button type="button" role="tab" id="tab-sheet" aria-controls="p-sheet" aria-selected="false">Cheat sheet</button>
-    <button type="button" role="tab" id="tab-job" aria-controls="p-job" aria-selected="false">Stories &amp; job</button>
+    <button type="button" role="tab" id="tab-cards" aria-controls="p-cards" aria-selected="false"><span class="long">Flashcards</span><span class="short">Cards</span><span class="badge" id="due-badge">0</span></button>
+    <button type="button" role="tab" id="tab-sheet" aria-controls="p-sheet" aria-selected="false"><span class="long">Cheat sheet</span><span class="short">Sheet</span></button>
+    <button type="button" role="tab" id="tab-job" aria-controls="p-job" aria-selected="false"><span class="long">Stories &amp; job</span><span class="short">Stories</span></button>
     <button type="button" role="tab" id="tab-dsa" aria-controls="p-dsa" aria-selected="false">DSA</button>
   </div>
 
@@ -366,6 +412,7 @@ footer{color:var(--muted); font-size:13px; border-top:1px solid var(--rule); pad
       <div class="fc-head">
         <label for="fc-topic" class="eyebrow">Deck</label>
         <select id="fc-topic"><option value="due">Today's reviews</option></select>
+        <button type="button" class="btn small" id="fc-opts" aria-expanded="false">Settings</button>
         <label class="opt" for="set-new">New cards a day
           <select id="set-new"><option>5</option><option>8</option><option>12</option><option>15</option><option>20</option><option>30</option></select></label>
         <label class="opt"><input type="checkbox" id="set-concepts"> Include key-word cards</label>
@@ -373,7 +420,7 @@ footer{color:var(--muted); font-size:13px; border-top:1px solid var(--rule); pad
         <span class="fc-prog" id="fc-prog"></span>
       </div>
       <div id="fc-area"></div>
-      <p class="intro" style="font-size:13px">Keys: <span class="kbd">Space</span> show answer · <span class="kbd">1</span> Forgot · <span class="kbd">2</span> Hard · <span class="kbd">3</span> Good · <span class="kbd">4</span> Easy. Rate <b>Good</b> only if you said every point in the checklist. "Practice" and "Mock" rounds never push cards further out. Progress is saved in this browser; back it up from the Today tab.</p>
+      <p class="intro keys-hint" style="font-size:13px">Keys: <span class="kbd">Space</span> show answer · <span class="kbd">1</span> Forgot · <span class="kbd">2</span> Hard · <span class="kbd">3</span> Good · <span class="kbd">4</span> Easy. Rate <b>Good</b> only if you said every point in the checklist. "Practice" and "Mock" rounds never push cards further out. Progress is saved in this browser; back it up from the Today tab.</p>
     </section>
   </div>
 
@@ -2905,6 +2952,12 @@ function showTab(name, focusId){
   else window.scrollTo(0, 0);
 }
 TABS.forEach(t => document.getElementById("tab-" + t).addEventListener("click", e => { showTab(t); e.currentTarget.blur(); }));
+const phone = () => window.matchMedia("(max-width: 700px)").matches;
+const tabsEl = document.querySelector(".tabs");
+const setTabH = () => document.documentElement.style.setProperty("--tabbar", (phone() ? tabsEl.offsetHeight : 0) + "px");
+setTabH(); window.addEventListener("resize", setTabH);
+const fcHead = document.querySelector(".fc-head");
+document.getElementById("fc-opts").addEventListener("click", e => { const on = fcHead.classList.toggle("open"); e.currentTarget.setAttribute("aria-expanded", String(on)); });
 
 // ================= Learn =================
 const topicsEl = document.getElementById("topics");
@@ -3048,6 +3101,7 @@ function next(){
   if (!cur) return renderDone();
   if (settings.timer || sel.value === "mock") startTimer(90);
   renderCard();
+  if (phone() && sessionDone) area.scrollIntoView();
 }
 function startTimer(sec){
   timeLeft = sec;
@@ -3100,7 +3154,7 @@ function renderCard(){
       <div class="card-top"><span class="eyebrow">${esc(t.name)} · ${cur.kind === "q" ? "Interview question" : "Key word"}${isNew ? " · new" : ""}</span>${timer}</div>
       <div class="front">${esc(cur.front)}</div>
       ${revealed ? `<div class="back">${back}</div>
-        ${cur.kind === "q" ? `<div class="actions"><button type="button" class="btn" id="rec">${recUrl ? "Record again (say it better this time)" : "Record my answer"}</button><span class="say">Say the answer once more now that you've seen it. That's the version to remember.</span></div>` : ""}` : `<p class="say">Answer out loud first, as if the interviewer just asked. ${cur.kind === "q" ? "Aim for 60–90 seconds." : ""}</p>
+        ${cur.kind === "q" ? `<div class="actions"><button type="button" class="btn" id="rec">${recUrl ? "Record again (say it better this time)" : "Record my answer"}</button><span class="say">Say the answer once more now that you've seen it. That's the version to remember.</span></div>` : ""}` : `<p class="say">Answer out loud first, as if the interviewer just asked. ${cur.kind === "q" ? "Aim for 60–90 seconds. " : ""}Then tap the card.</p>
         <div class="actions"><button type="button" class="btn primary" id="reveal">Show answer <span class="kbd" style="color:inherit;border-color:currentColor">Space</span></button>
         ${cur.kind === "q" ? `<button type="button" class="btn" id="rec">Record my answer</button>` : ""}</div>`}
       <audio id="rec-play" controls ${recUrl ? `src="${recUrl}"` : "hidden"}></audio>
@@ -3110,8 +3164,10 @@ function renderCard(){
       <button type="button" data-r="2">Hard<small>${nextInterval(cur.id,2)}</small></button>
       <button type="button" class="good" data-r="3">Good<small>${nextInterval(cur.id,3)}</small></button>
       <button type="button" data-r="4">Easy<small>${nextInterval(cur.id,4)}</small></button></div>` : ""}`;
+  area.classList.toggle("revealed", revealed);
   const rv = document.getElementById("reveal");
   if (rv) rv.addEventListener("click", reveal);
+  if (!revealed) area.querySelector(".card").addEventListener("click", e => { if (!e.target.closest("button, audio, a, input, label")) reveal(); });
   const rb = document.getElementById("rec");
   if (rb) rb.addEventListener("click", toggleRec);
   area.querySelectorAll("[data-r]").forEach(b => b.addEventListener("click", () => rate(+b.dataset.r)));
@@ -3143,7 +3199,7 @@ function rate(r){
   next();
 }
 function renderDone(){
-  stopTimer();
+  stopTimer(); area.classList.remove("revealed");
   prog.textContent = sessionDone ? `${sessionDone} done this session` : "";
   const deckSize = ORDERED.filter(c => inDeck(c.id)).length;
   if (!deckSize && sel.value !== "mock") {
