@@ -3659,9 +3659,36 @@ function showTab(name, focusId){
   LS.set("drill.tab.v1", name);
   if (name === "cards" && (wasHidden || !cur)) startSession();
   if (focusId) { const el = document.getElementById(focusId); if (el) el.scrollIntoView(); }
-  else window.scrollTo(0, 0);
+  else if (wasHidden) restoreScroll(name);
 }
 TABS.forEach(t => document.getElementById("tab-" + t).addEventListener("click", e => { showTab(t); e.currentTarget.blur(); }));
+
+// Remember where you were: scroll position per tab, and which Learn questions were open, so a refresh
+// or a tab switch brings you back to the same place instead of the top.
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+const scrollPos = LS.get("drill.scroll.v1", {});
+let scrollTimer = null;
+window.addEventListener("scroll", () => {
+  if (scrollTimer) return;
+  scrollTimer = setTimeout(() => {
+    scrollTimer = null;
+    const t = LS.get("drill.tab.v1", "today");
+    scrollPos[t] = Math.round(window.scrollY);
+    LS.set("drill.scroll.v1", scrollPos);
+  }, 300);
+}, {passive: true});
+function restoreScroll(tab){
+  const y = scrollPos[tab] || 0;
+  const prev = document.documentElement.style.scrollBehavior;
+  document.documentElement.style.scrollBehavior = "auto";
+  window.scrollTo(0, y);
+  requestAnimationFrame(() => { window.scrollTo(0, y); document.documentElement.style.scrollBehavior = prev; });
+}
+const openItems = new Set(LS.get("drill.open.v1", []));
+function rememberOpen(d){
+  if (d.open) openItems.add(d.id); else openItems.delete(d.id);
+  LS.set("drill.open.v1", [...openItems].slice(-30));
+}
 const phone = () => window.matchMedia("(max-width: 700px)").matches;
 const tabsEl = document.querySelector(".tabs");
 const setTabH = () => document.documentElement.style.setProperty("--tabbar", (phone() ? tabsEl.offsetHeight : 0) + "px");
@@ -3670,6 +3697,7 @@ const fcHead = document.querySelector(".fc-head");
 document.getElementById("fc-opts").addEventListener("click", e => { const on = fcHead.classList.toggle("open"); e.currentTarget.setAttribute("aria-expanded", String(on)); });
 
 // ================= Learn =================
+const openedBySearch = new Set();
 const topicsEl = document.getElementById("topics");
 const indexEl = document.getElementById("index");
 const jumpEl = document.getElementById("topic-jump");
@@ -3711,10 +3739,13 @@ T.forEach((t, ti) => {
   jumpEl.insertAdjacentHTML("beforeend", `<option value="t-${t.id}">${ti + 1}. ${esc(t.name)}</option>`);
 });
 jumpEl.addEventListener("change", () => { const el = document.getElementById(jumpEl.value); if (el) el.scrollIntoView(); });
+document.querySelectorAll("#topics details.item").forEach(d => {
+  if (openItems.has(d.id)) d.open = true;
+  d.addEventListener("toggle", () => { if (!openedBySearch.has(d)) rememberOpen(d); });
+});
 
 let filter = "all";
 const qEl = document.getElementById("q");
-const openedBySearch = new Set();
 function renderLearn(){
   const term = qEl.value.trim().toLowerCase();
   const active = !!term || filter !== "all";
@@ -4043,6 +4074,7 @@ setInterval(() => { if (today() !== lastDay) { lastDay = today(); loadState(); r
 try { localStorage.setItem("drill.probe", "1"); localStorage.removeItem("drill.probe"); } catch (e) { storageOk = false; warnStorage(); }
 refreshAll();
 showTab(LS.get("drill.tab.v1", "today"));
+restoreScroll(LS.get("drill.tab.v1", "today"));   // on a refresh, go back to where you were
 </script>
 </body>
 </html>
