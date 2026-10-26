@@ -3682,7 +3682,7 @@ function restoreScroll(tab){
   const prev = document.documentElement.style.scrollBehavior;
   document.documentElement.style.scrollBehavior = "auto";
   window.scrollTo(0, y);
-  requestAnimationFrame(() => { window.scrollTo(0, y); document.documentElement.style.scrollBehavior = prev; });
+  document.documentElement.style.scrollBehavior = prev;
 }
 const openItems = new Set(LS.get("drill.open.v1", []));
 function rememberOpen(d){
