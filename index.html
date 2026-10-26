@@ -2724,7 +2724,7 @@ async function toggleRec(){
       const pl = document.getElementById("rec-play");
       if (pl) { pl.src = recUrl; pl.hidden = false; }
       const b = document.getElementById("rec");
-      if (b) b.textContent = "Record again";
+      if (b) b.textContent = revealed ? "Record again (say it better this time)" : "Record again";
     };
     rec.start();
     btn.textContent = "Stop recording";
@@ -2747,10 +2747,11 @@ function renderCard(){
   area.innerHTML = `<div class="card">
       <div class="card-top"><span class="eyebrow">${esc(t.name)} · ${cur.kind === "q" ? "Interview question" : "Key word"}${isNew ? " · new" : ""}</span>${timer}</div>
       <div class="front">${esc(cur.front)}</div>
-      ${revealed ? `<div class="back">${back}</div>` : `<p class="say">Answer out loud first, as if the interviewer just asked. ${cur.kind === "q" ? "Aim for 60–90 seconds." : ""}</p>
+      ${revealed ? `<div class="back">${back}</div>
+        ${cur.kind === "q" ? `<div class="actions"><button type="button" class="btn" id="rec">${recUrl ? "Record again (say it better this time)" : "Record my answer"}</button><span class="say">Say the answer once more now that you've seen it. That's the version to remember.</span></div>` : ""}` : `<p class="say">Answer out loud first, as if the interviewer just asked. ${cur.kind === "q" ? "Aim for 60–90 seconds." : ""}</p>
         <div class="actions"><button type="button" class="btn primary" id="reveal">Show answer <span class="kbd" style="color:inherit;border-color:currentColor">Space</span></button>
         ${cur.kind === "q" ? `<button type="button" class="btn" id="rec">Record my answer</button>` : ""}</div>`}
-      <audio id="rec-play" controls ${recUrl && revealed ? `src="${recUrl}"` : "hidden"}></audio>
+      <audio id="rec-play" controls ${recUrl ? `src="${recUrl}"` : "hidden"}></audio>
     </div>
     ${revealed ? `<div class="rate" style="margin-top:10px">
       <button type="button" class="again" data-r="1">Forgot<small>${nextInterval(cur.id,1)}</small></button>
@@ -2763,7 +2764,7 @@ function renderCard(){
   if (rb) rb.addEventListener("click", toggleRec);
   area.querySelectorAll("[data-r]").forEach(b => b.addEventListener("click", () => rate(+b.dataset.r)));
 }
-function reveal(){ if (!cur || revealed) return; stopTimer(); stopRec(); revealed = true; setTimeout(renderCard, rec && rec.state !== "inactive" ? 150 : 0); renderCard(); }
+function reveal(){ if (!cur || revealed) return; stopTimer(); const wasRec = rec && rec.state === "recording"; stopRec(); revealed = true; setTimeout(renderCard, wasRec ? 400 : 0); if (!wasRec) renderCard(); }
 function rate(r){
   if (!cur || !revealed) return;
   loadState();                                   // pick up changes from other open tabs
