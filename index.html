@@ -3935,6 +3935,39 @@ FROM accounts a LEFT JOIN ranked r
  k:"Code · SQL · design · incident story · revisit weak areas",
  a:`<p><b>One repeatable week:</b> Practise two Java problems without an IDE and test edge cases; solve two SQL queries; explain one design in 30–45 minutes; rehearse one real project and one incident story; then review weak cards and re-record one answer.</p><p>Adjust to the job description. For a role emphasizing Java and SQL Server, focus on Java, relational SQL, T-SQL differences and practical tests before specialist JVM or AI topics. Ask a peer to challenge assumptions where possible. Spaced repetition helps memory, but writing and speaking are essential practice.</p><p><b>Say it:</b> Each week I code, query, design, tell a real story and revisit what I could not explain.</p>`}
 ]);
+// Practical scenarios from October 30 screenshot review.
+addItems("sdcase", [
+{q:"How would you find a nearby available driver without scanning every driver?",
+ p:"Look for taxis in nearby streets first, rather than calling every taxi in the country. A nearby driver may already be busy, so check availability before assigning one.",
+ k:"Location updates → nearby candidates → check freshness and availability → atomic assignment",
+ a:`<p><b>Short answer:</b> Store recent driver locations in a geospatial index, search a small area, filter for available drivers, and try to assign one safely.</p><p>For example, Redis GEOSEARCH or a spatial database can find candidates within a radius. Expand the radius if needed. Discard stale locations and account for road travel time rather than trusting straight-line distance alone. Atomically claim an available driver so two riders cannot both book the same one; handle an offer expiring or being declined.</p><p><b>Say it:</b> I find nearby candidates with a spatial index, check freshness and availability, then claim one atomically.</p>`},
+{q:"A large upload fails at 90%. How can a user resume safely?",
+ p:"A book is mailed in numbered boxes. If box 9 is lost, resend that box instead of mailing all the others again.",
+ k:"Upload session · numbered parts · record successes · retry missing · complete or clean up",
+ a:`<p><b>Short answer:</b> Split the file into numbered parts and remember which parts succeeded. After a network failure, retry the missing parts and complete the upload once all parts are present.</p><p>Use short-lived authorized upload access, size limits and checksums. Keep the upload ID and part metadata; retrying must not corrupt the result. Complete only after validating the parts, and abort abandoned uploads to avoid storage costs. A progress indicator should reflect confirmed parts, not just bytes the browser tried to send.</p><p><b>Say it:</b> Track an upload session and confirmed chunks so I can retry only missing parts and clean up abandoned uploads.</p>`}
+]);
+addItems("cache", [
+{q:"Cache hit rate is 95%, but the database still fails at the same time each evening. How do you investigate?",
+ p:"A shop serves 95 out of 100 customers from the front shelf. If a huge crowd arrives, the five who need the storeroom can still overwhelm it.",
+ k:"5% of peak may still be huge · check expensive misses, expiry, jobs and pool waits",
+ a:`<p><b>Short answer:</b> A percentage hides the absolute number and cost of misses. At 20,000 requests/s, a 5% miss rate can mean 1,000 database requests/s before considering retries or multiple queries per miss.</p><p>Break down traffic and hit rate by endpoint and key. Correlate DB queries, connection pool waits, locks, scheduled work, cache expiry and eviction at the time of failure. Look for stampedes, hot or uncached keys, and retries. Confirm the bottleneck before adding replicas or cache capacity.</p><p><b>Say it:</b> I convert miss rate to actual load and trace expensive misses and scheduled activity to the database.</p>`}
+]);
+addItems("jvmpractice", [
+{q:"Writes to a shared HashMap are synchronized, but reads are not. Is that safe?",
+ p:"A clerk locks the filing cabinet while moving files, but other clerks open drawers without using the lock. They can see it halfway through the change.",
+ k:"All shared access needs a consistent rule · atomic individual calls do not make a multi-step operation atomic",
+ a:`<p><b>Short answer:</b> No. Unsynchronized reads of a HashMap while another thread writes have no shared locking guarantee and can see inconsistent state. Use the same lock for all access or use an appropriate concurrent collection.</p><p>ConcurrentHashMap makes individual supported operations safe, but a check followed by a separate update can still race. Use atomic methods such as compute or a lock around the full invariant. Return copies or immutable values when callers might mutate shared objects.</p><p><b>Say it:</b> Protect reads and writes consistently, and protect the whole operation when correctness spans multiple steps.</p>`},
+{q:"Allocation rises and GC pauses get longer after a release. What evidence separates allocation from a leak?",
+ p:"A shop may receive too many boxes each minute, or it may never throw old boxes away. Both fill the floor, but need different fixes.",
+ k:"Compare allocation rate, post-GC live set, pause cause and retained objects before tuning",
+ a:`<p><b>Short answer:</b> Compare allocation rate and post-GC live data under similar load. High allocation with a stable live set suggests churn; a rising live set may indicate retention, but could also reflect legitimate workload growth.</p><p>Use GC logs and JFR or a profiler to locate allocation sources and pause causes. Compare heap dumps when retention is suspected; check container limits and CPU as well. Increasing heap can change pause behavior without fixing the cause. Benchmark changes and record the before and after conditions.</p><p><b>Say it:</b> I distinguish new-object churn from retained data with allocation profiles, GC logs and heap evidence.</p>`}
+]);
+addItems("sec", [
+{q:"Does every Spring request pass through the same six security filters?",
+ p:"A building can have several entrances with different security desks. The desk used depends on which entrance the visitor takes.",
+ k:"First matching security chain · configured filters vary · 401 and 403 need context",
+ a:`<p><b>Short answer:</b> No. Spring Security selects a matching SecurityFilterChain; the filters present and their order depend on configuration and version. A resource server may include a bearer-token filter, but not every app does.</p><p>Authentication failures commonly lead to 401 and insufficient permissions to 403, but CSRF and custom handlers can also produce 403 responses. Inspect the configured chain and use targeted debug logs without exposing credentials. Cookie-based browser authentication can need CSRF protection even if an API is described as stateless.</p><p><b>Say it:</b> I inspect the matching chain and failure handler instead of assuming a fixed list or a single cause for every 403.</p>`}
+]);
 // ================= Diagrams =================
 const DEFS = `<defs>
 <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker>
