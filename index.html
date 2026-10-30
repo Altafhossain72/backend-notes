@@ -3968,6 +3968,81 @@ addItems("sec", [
  k:"First matching security chain · configured filters vary · 401 and 403 need context",
  a:`<p><b>Short answer:</b> No. Spring Security selects a matching SecurityFilterChain; the filters present and their order depend on configuration and version. A resource server may include a bearer-token filter, but not every app does.</p><p>Authentication failures commonly lead to 401 and insufficient permissions to 403, but CSRF and custom handlers can also produce 403 responses. Inspect the configured chain and use targeted debug logs without exposing credentials. Cookie-based browser authentication can need CSRF protection even if an API is described as stateless.</p><p><b>Say it:</b> I inspect the matching chain and failure handler instead of assuming a fixed list or a single cause for every 403.</p>`}
 ]);
+// Senior design patterns: generic examples based on common backend handler structures.
+addTopic("patterns", "Design patterns in senior backend interviews", {
+pic:`<p>Imagine a workshop. A <b>strategy</b> is a tool chosen for the job. A <b>factory</b> creates an object; a <b>registry</b> finds an existing one. An <b>adapter</b> translates between plugs. A <b>decorator</b> wraps a tool to add behavior. A <b>state machine</b> decides which step can happen next.</p><p>In an interview, don't start by naming every pattern. Start with the problem, show the simplest useful design, explain how you test it and what can go wrong. Patterns may work together, and code does not need a pattern for every variation.</p>`,
+c:[["Strategy","Choose one of several ways to perform the same task."],["Factory","Centralize object creation; a method that only selects an existing object is often better described as a registry or router."],["Adapter","Translate an external interface into the interface your code needs."],["Decorator","Wrap an object to add behavior while keeping its interface."],["Chain of responsibility","Pass a request through handlers; define whether each one continues or stops the chain."],["State machine","Explicit states and allowed transitions for a lifecycle."],["Dependency injection","Give an object its dependencies instead of constructing them inside it."],["Ports and adapters","Keep domain-facing interfaces separate from external implementations."]],
+h:"Problem → small interface → choice → test → trade-off",
+},[
+{q:"What is the difference between Strategy, Factory and a handler registry?",
+ p:"A drill can use different bits: each bit is a strategy. A factory makes a bit; a registry finds a bit already on the shelf.",
+ k:"Strategy = behavior · factory = creation · registry = lookup",
+ a:`<p><b>Short answer:</b> Strategy swaps how work is done through a common interface. A factory centralizes creation. A registry or router selects an already-created implementation using a key.</p><p>In Spring, a class called a factory may actually receive existing handler beans and store them in a map. It is fair to call it a handler factory if that is its project name; explain that it selects existing beans, while the handlers are the interchangeable strategies.</p><p><b>Say it:</b> The strategy performs the work; our registry selects the correct handler. Spring creates the beans.</p>`},
+{q:"How can I explain a real handler-registry example from payment operations?",
+ p:"Different payment types need different recovery procedures. One front desk identifies the type and sends it to the right specialist.",
+ k:"Common handler interface → injected implementations → key lookup → reject unknown type",
+ a:`<p><b>Example:</b> A generic recovery or reversal flow receives a transaction type. A shared handler interface defines the operation, and separate handlers implement the behavior needed for each type. A registry selects the matching handler.</p><p>In the code reviewed for this guide, Spring supplies a collection of handlers, the registry indexes them by a service key and returns a handler; an unknown key is rejected. Explain your own contribution accurately. The design reduces a central conditional, but every handler still needs tests and the registry must handle missing or duplicate keys deliberately.</p><p><b>Say it:</b> We separated service-specific recovery behavior behind one interface and selected the matching handler by type.</p>`},
+{q:"How would you implement a safe strategy registry in Spring?",
+ p:"The front desk gets a list of specialists at startup and creates a directory. Two people claiming the same specialty should be reported, not silently overwritten.",
+ k:"Inject list · build immutable map · reject duplicate keys · missing key fails clearly",
+ a:`<p><b>Short answer:</b> Inject a list of handler beans, build a map by a stable business key, reject duplicates during startup, and report an unsupported key clearly at lookup.</p><pre><code>interface Handler {
+  String type();
+  Result handle(Command command);
+}
+
+class HandlerRegistry {
+  private final Map&lt;String, Handler&gt; handlers;
+  HandlerRegistry(List&lt;Handler&gt; list) {
+    Map&lt;String, Handler&gt; map = new HashMap&lt;&gt;();
+    for (Handler h : list) {
+      if (map.putIfAbsent(h.type(), h) != null)
+        throw new IllegalStateException("Duplicate handler");
+    }
+    handlers = Map.copyOf(map);
+  }
+  Handler get(String type) {
+    Handler h = handlers.get(type);
+    if (h == null) throw new IllegalArgumentException("Unsupported type");
+    return h;
+  }
+}</code></pre><p>This is an illustrative design, not a claim that every existing registry already has these checks. Java 8 projects can use an unmodifiable copy instead of Map.copyOf. Spring's automatic Map&lt;String, Handler&gt; injection uses bean names as keys; construct a separate map when business keys differ.</p><p><b>Say it:</b> I validate the registry at startup and make unsupported types explicit.</p>`},
+{q:"What should you test when adding a new strategy or handler?",
+ p:"Before a new specialist handles a customer's work, check their training and whether the front desk routes the right cases to them.",
+ k:"Handler unit tests · registry tests · shared contract tests · failure and concurrency cases",
+ a:`<p><b>Short answer:</b> Test the handler's behavior, that the registry selects it for the correct key, and that all handlers satisfy the same contract.</p><p>Include missing and duplicate keys, provider failures, retry and timeout behavior, and concurrent requests where relevant. For money movement, test that a retry cannot create an unintended second effect and that an unknown outcome is reconciled. Use a real database integration test for transactional constraints when needed.</p><p><b>Say it:</b> I test the new implementation, the routing, the common contract, and failure boundaries.</p>`},
+{q:"Strategy vs a switch: when is a pattern not worth adding?",
+ p:"If there are only two fixed light switches, a labeled switchboard may be simpler than hiring a separate electrician for each light.",
+ k:"Small stable cases → switch may be clearer · growing independent behavior → strategy",
+ a:`<p><b>Short answer:</b> A switch is reasonable for a small, stable set of simple cases. Strategy becomes useful when behaviors grow, change independently, need different dependencies or deserve separate tests.</p><p>A strategy registry adds files, indirection and key management. Do not promise zero changes for every new implementation: wiring, configuration, tests and business validation may still change. Measure the design against actual change frequency and team comprehension.</p><p><b>Say it:</b> I start simple and introduce strategies when independent variation justifies the extra structure.</p>`},
+{q:"What is an Adapter, and how does it help with external payment or notification providers?",
+ p:"A travel adapter lets different plugs connect to one socket; the device does not need to know the shape of every foreign plug.",
+ k:"Internal port → provider adapter → translate request, response and errors",
+ a:`<p><b>Short answer:</b> Define an internal interface around what your application needs, then implement an adapter that translates it to a provider's API and maps the response back.</p><p>Keep provider-specific payloads at the boundary, use contract tests and timeouts, and preserve meaningful differences such as pending versus failed. An adapter cannot make every provider identical: document capabilities, idempotency support and error semantics.</p><p><b>Say it:</b> The adapter isolates external protocol details while preserving important provider differences.</p>`},
+{q:"Decorator vs proxy vs adapter: how do you distinguish them?",
+ p:"An adapter changes the plug; a decorator adds a protective cover; a proxy stands at the door and controls access to the original object.",
+ k:"Adapter changes interface · decorator adds behavior · proxy controls access or intercepts calls",
+ a:`<p><b>Short answer:</b> An adapter translates between interfaces. A decorator wraps the same interface to add behavior. A proxy stands in for another object and can intercept or control access; the distinctions depend on intent and can overlap.</p><p>A Spring transaction proxy intercepts eligible calls to apply transaction behavior. Self-invocation can bypass proxy advice; an already active transaction may still exist. Do not assume every method is intercepted: proxy type and method visibility matter.</p><p><b>Say it:</b> I explain the intent: translate, add behavior, or intercept access.</p>`},
+{q:"Chain of Responsibility vs Strategy: should every validator run?",
+ p:"A strategy chooses one route; a checklist passes a request through several checks. Some checklists stop on the first failure; others collect every problem.",
+ k:"Strategy picks one behavior · chain passes through handlers · define ordering and stopping",
+ a:`<p><b>Short answer:</b> Strategy normally selects one behavior for a task. A chain processes a request through one or more handlers, depending on the implementation.</p><p>For request validation, decide whether to stop on the first failure or collect errors. Make ordering and side effects explicit; validation should not debit an account. Separate security checks from business checks when their contracts or error handling differ.</p><p><b>Say it:</b> One strategy is selected; a chain has multiple steps and an explicit continuation rule.</p>`},
+{q:"State pattern vs a persisted state machine: how do you keep a transaction lifecycle safe?",
+ p:"A parcel can be prepared, sent, delivered or returned. A status label alone does not stop someone marking it returned before it was sent.",
+ k:"Explicit states + allowed transitions · atomic claim · unknown outcome · audit",
+ a:`<p><b>Short answer:</b> The State pattern moves state-dependent behavior into objects. A persisted state machine represents states and permitted transitions in stored data; it may or may not use the State pattern.</p><p>Define allowed transitions, ownership and retry semantics. Use an atomic database update or locking to prevent competing workers taking the same transition, and record an audit trail. An external timeout can be unknown, not failed; use provider status and reconciliation. A pattern name alone cannot guarantee correctness.</p><p><b>Say it:</b> I make transitions explicit and enforce them atomically; I use State objects only if they make the behavior clearer.</p>`},
+{q:"Observer or events: what happens if the database commits but the notification fails?",
+ p:"A shop records an order and then tells the kitchen. If the messenger leaves after the order is saved but before notifying, the kitchen never hears about it.",
+ k:"In-process event ≠ durable message · outbox + relay · duplicate-safe consumer",
+ a:`<p><b>Short answer:</b> An in-process observer or application event decouples code, but it is not automatically durable. If a database update and an external message must stay consistent, consider a transactional outbox.</p><p>Write the business change and outbox entry in the same database transaction. A relay publishes afterward; it may publish twice if it crashes before marking success. Consumers need idempotent effects, and the team needs monitoring and replay procedures.</p><p><b>Say it:</b> I use events for decoupling, and add durable delivery and duplicate handling when the business requires it.</p>`},
+{q:"When is a Singleton safe in a Spring application, and what can still go wrong?",
+ p:"One shared office printer is convenient, but putting a customer's unfinished form on it for the next customer to use causes mix-ups.",
+ k:"Spring singleton = one bean per container · shared mutable state needs protection",
+ a:`<p><b>Short answer:</b> Spring's default singleton scope means one bean instance per bean definition per application context, not one instance across the whole deployment.</p><p>Singleton services can serve many requests concurrently. Keep per-request data in local variables or correctly scoped objects; protect genuinely shared mutable state. Multiple application replicas have separate instances. A classic Java singleton is scoped to its class loader and differs from a Spring bean scope.</p><p><b>Say it:</b> One bean per context is not automatically thread-safe or global across servers.</p>`},
+{q:"How do I answer 'which patterns have you used?' using my own work?",
+ p:"Tell a short repair story: what was difficult, what you changed, how it behaved, and what you learned. The pattern name comes after the problem.",
+ k:"Problem → my contribution → pattern and why → test → limitation",
+ a:`<p><b>Structure:</b> Pick one real example, such as selecting transaction-type-specific recovery handlers. Describe the original problem, the shared interface, how the implementation is selected, and the tests or evidence you actually have.</p><p>Explain one limitation: duplicate keys, unknown types, differing provider behavior or extra indirection. Be clear about what you personally wrote and what was team work. Do not share customer details, internal identifiers or production-only configuration in a public interview example.</p><p><b>Say it:</b> We had different operations by transaction type, so we used a common handler interface and a registry. I can explain how routing and failure handling were tested.</p>`}
+]);
 // ================= Diagrams =================
 const DEFS = `<defs>
 <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path class="arrow" d="M0,0 L8,4 L0,8 z"/></marker>
